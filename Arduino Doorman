@@ -1,0 +1,187 @@
+/***************************************************************************************
+    Name    : The Arduino Doorman
+    Author  : Hannes Tamme, Marius Richter
+    Created : April 08, 2018
+    Last Modified: April 11, 2018
+    A DS3232 Clock was used for this build, change library if a different clock is used
+ ***************************************************************************************/
+
+//---------LIBRARIES---------------------
+#include <TMRpcm.h>
+#include <SPI.h>
+#include <SD.h>
+#include <DS3231.h>
+//---------PIN DEFINTIONS---------------------
+#define CS_PIN 10
+#define MOTION 4
+#define SOUND A2
+#define SOUND2 A3
+#define DOOR 2
+#define ECHO A0
+#define TRIG A1
+//---------CLOCK DEFINTIONS-------------------
+DS3231  rtc(SDA, SCL);
+//---------SPEAKER DEFINTION-------------------
+TMRpcm speaker;
+
+
+void setup()
+{
+  //---------PIN MODES-------------------
+  speaker.speakerPin = 9;
+  pinMode(MOTION, INPUT);
+  pinMode(SOUND, INPUT);
+  pinMode(DOOR, INPUT);
+  pinMode(ECHO, INPUT);
+  pinMode(TRIG, OUTPUT);
+  pinMode(DOOR, INPUT_PULLUP);
+  pinMode(SOUND2, INPUT);
+
+  //---------START UP-------------------
+  Serial.begin(9600);
+  Serial.println("Doorman Version 1.0 Beta");
+  Serial.println("Initializing SD Card");
+  pinMode(CS_PIN, OUTPUT);
+  if (!SD.begin(CS_PIN)) {
+    Serial.println("SD Card Failure");
+    return;
+  }
+  Serial.println("SD Card Ready");
+  Serial.println();
+  Serial.println("Intializing the CLock");
+  rtc.begin();
+  Serial.println("Time read: ");
+  Serial.print(rtc.getTimeStr());
+
+}
+
+
+void loop()   {
+  if (digitalRead(MOTION) == HIGH) {
+    Serial.println("MOTION DETECTED");
+    if (distancecheck() ==  true) {
+      Serial.println("DISTANCE DETECTED");
+      playsomething("distance/");
+
+    }
+
+    else if (digitalRead(DOOR) == HIGH) {
+      playsomething("door/");
+    }
+    else if (timecheck() == 1) {
+      Serial.println("MORNING DETECTED");
+      if (soundcheck() == true) {
+        Serial.println("SOUND DETECTED");
+        playsomething("msound/");
+      }
+
+
+      else {
+        playsomething("morning/");
+      }
+    }
+    else if (timecheck() == 2) {
+      Serial.println("EVENING DETECTED");
+      if (soundcheck() == true) {
+        Serial.println("SOUND DETECTED");
+        playsomething("esound/");
+      }
+
+      else {
+
+        playsomething("evening/");
+      }
+    }
+    else if (timecheck() == 3) {
+      Serial.println("NIGHT DETECTED");
+      if (soundcheck() == true) {
+        Serial.println("SOUND DETECTED");
+        playsomething("nsound/");
+      }
+      else {
+
+        playsomething("night/");
+      }
+    }
+
+  }
+}
+// --------------DOORMAN FUNCTIONS----------------------------------------
+
+void playsomething(String path) {
+  int a = random(1, 4);
+  // char b[2];
+  String str;
+  str = String(a);
+  String str2 = ".wav";
+  String filename = path + str + str2;
+  char *output = filename.c_str();
+  Serial.print("Playing: ");
+  Serial.println(output);
+
+  speaker.play(output);
+  delay(5000);
+
+  return;
+}
+
+// ------------------------------------------------------
+
+int timecheck()
+{
+  int zeit;
+  int i = atoi(rtc.getTimeStr(FORMAT_SHORT));
+
+  if (i > 20 || i < 7) {
+    zeit = 3;
+  }
+  else if (i > 13 || i < 21) {
+    zeit = 2;
+  }
+  else {
+    zeit = 1;
+  }
+  return zeit;
+}
+
+// ------------------------------------------------------
+
+bool distancecheck() {
+  bool i;
+  long duration;
+  int distance;
+  int tresholddistance = 15;
+  // Clears the trigPin
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  duration = pulseIn(ECHO, HIGH);
+  distance = duration * 0.034 / 2;
+  if (distance < tresholddistance)
+  { i = true;
+  }
+  else {
+    i = false;
+  }
+  return i;
+}
+
+// ------------------------------------------------------
+
+bool soundcheck() {
+  bool j;
+  int tresholdsound = 10;
+  int i;
+  i = analogRead(SOUND2);
+  if ( i >= tresholdsound || digitalRead(SOUND) == 1)  
+  {
+    j = true;
+
+  }
+  else {
+    j = false;
+  }
+  return j;
+}
